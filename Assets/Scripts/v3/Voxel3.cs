@@ -6,4 +6,12 @@ public struct Voxel3
     public bool isSource;
     public Vector3 position;
     public byte fluidLevel;
+
+    public bool Equals(Voxel3 other)
+    {
+        return isSolid == other.isSolid &&
+               isSource == other.isSource &&
+               position == other.position &&
+               fluidLevel == other.fluidLevel;
+    }
 }
