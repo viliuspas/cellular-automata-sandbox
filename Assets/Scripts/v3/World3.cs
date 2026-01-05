@@ -1,4 +1,7 @@
+using NUnit.Framework;
 using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 
 public class World3 : MonoBehaviour
@@ -6,12 +9,18 @@ public class World3 : MonoBehaviour
     private const byte maxFluidLevel = 127;
     private const byte minFluidLevel = 1;
 
-    private Voxel3[,,] voxels;
-    private Voxel3[,,] previousVoxels;
-    private static GameObject[,,] voxelObjects;
+    private Voxel3[] voxels;
+    private Voxel3[] previousVoxels;
+    private static GameObject[] voxelObjects;
     private Voxel3 defaultVoxel = new Voxel3();
+    private HashSet<int> waterVoxelsIndexes = new HashSet<int>();
+    private HashSet<int> prevWaterVoxelsIndexes = new HashSet<int>();
 
-    private Vector3Int worldSize = new Vector3Int(30, 30, 30);
+    //private Vector3Int worldSize = new Vector3Int(30, 30, 30);
+    private readonly int worldSizeX = 30;
+    private readonly int worldSizeY = 30;
+    private readonly int worldSizeZ = 30;
+
     public GameObject solidPrefab;
     public GameObject waterPrefab;
 
@@ -20,68 +29,105 @@ public class World3 : MonoBehaviour
 
     float lastNoiseScale, lastThreshold;
 
-
     void Start()
     {
+        lastNoiseScale = noiseScale;
+        lastThreshold = threshold;
         InitVoxels();
     }
 
     void Update()
     {
-        for (int z = 0; z < worldSize.z; z++)
-        {
-            for (int x = 0; x < worldSize.x; x++)
-            {
-                for (int y = 0; y < worldSize.y; y++)
-                {
-                    if (voxels[x,y,z].isSolid)
-                    {
-                        continue;
-                    }
+        //for (int z = 0; z < worldSizeZ; z++)
+        //{
+        //    for (int x = 0; x < worldSizeX; x++)
+        //    {
+        //        for (int y = 0; y < worldSizeY; y++)
+        //        {
+        //            if (voxels[x + worldSizeX * (y + worldSizeY * z)].isSolid)
+        //            {
+        //                continue;
+        //            }
 
-                    bool hasFlownDown = FlowDown(x, y, z);
-                    if (!hasFlownDown)
-                        FlowSideways(x, y, z);
-                }
-            }
+        //            bool hasFlownDown = FlowDown(x, y, z);
+        //            if (!hasFlownDown)
+        //                FlowSideways(x, y, z);
+        //        }
+        //    }
+        //}
+        prevWaterVoxelsIndexes = new HashSet<int>(waterVoxelsIndexes);
+
+        foreach (int voxelIndex in prevWaterVoxelsIndexes)
+        {
+            if (voxels[voxelIndex].isSettled)
+                continue;
+
+            int x = voxelIndex % worldSizeX;
+            int yz = voxelIndex / worldSizeX;
+            int y = yz % worldSizeY;
+            int z = yz / worldSizeY;
+
+            VoxelNeigbours(x, y, z, CheckNeighbourVoxel); // todo: remove duplicate checks
         }
 
-        previousVoxels = voxels.Clone() as Voxel3[,,];
+        previousVoxels = voxels.Clone() as Voxel3[];
 
         ReRenderVoxels();
     }
 
-    private void OnValidate()
+    private static void VoxelNeigbours(int x, int y, int z, Action<int, int, int> func)
     {
-        if (noiseScale != lastNoiseScale || threshold != lastThreshold)
-        {
-            for (int z = 0; z < worldSize.z; z++)
-            {
-                for (int x = 0; x < worldSize.x; x++)
-                {
-                    for (int y = 0; y < worldSize.y; y++)
-                    {
-                        DeleteVoxel(x, y, z);
-                    }
-                }
-            }
-
-            InitVoxels();
-            lastNoiseScale = noiseScale;
-            lastThreshold = threshold;
-        }
+        func(x + 1, y, z);
+        func(x - 1, y, z);
+        func(x, y + 1, z);
+        func(x, y - 1, z);
+        func(x, y, z + 1);
+        func(x, y, z - 1);
     }
+
+    private void CheckNeighbourVoxel(int x, int y, int z)
+    {
+        if (!IsValidPosition(x, y, z) || voxels[x + worldSizeX * (y + worldSizeY * z)].isSolid)
+        {
+            return;
+        }
+
+        bool hasFlownDown = FlowDown(x, y, z);
+        if (!hasFlownDown)
+            FlowSideways(x, y, z);
+    }
+
+    //private void OnValidate()
+    //{
+    //    if (noiseScale != lastNoiseScale || threshold != lastThreshold)
+    //    {
+    //        for (int z = 0; z < worldSizeZ; z++)
+    //        {
+    //            for (int x = 0; x < worldSizeX; x++)
+    //            {
+    //                for (int y = 0; y < worldSizeY; y++)
+    //                {
+    //                    DeleteVoxel(x, y, z);
+    //                }
+    //            }
+    //        }
+
+    //        InitVoxels();
+    //        lastNoiseScale = noiseScale;
+    //        lastThreshold = threshold;
+    //    }
+    //}
 
     private void ReRenderVoxels()
     {
-        for (int z = 0; z < worldSize.z; z++)
+        for (int z = 0; z < worldSizeZ; z++)
         {
-            for (int x = 0; x < worldSize.x; x++)
+            for (int x = 0; x < worldSizeX; x++)
             {
-                for (int y = 0; y < worldSize.y; y++)
+                for (int y = 0; y < worldSizeY; y++)
                 {
-                    if (voxelObjects[x, y, z] == null || voxels[x, y, z].isSolid) continue;
-                    ReRenderVoxel(voxels[x, y, z], new Vector3(x, y, z));
+                    if (voxelObjects[x + worldSizeX * (y + worldSizeY * z)] == null || voxels[x + worldSizeX * (y + worldSizeY * z)].isSolid) continue;
+                    ReRenderVoxel(voxels[x + worldSizeX * (y + worldSizeY * z)], new Vector3(x, y, z));
                 }
             }
         }
@@ -89,27 +135,32 @@ public class World3 : MonoBehaviour
 
     private void InitVoxels()
     {
-        CaveGenerator caveGen = new CaveGenerator(worldSize.x, worldSize.y, worldSize.z, noiseScale, threshold);
-        (voxels, voxelObjects) = caveGen.Generate(solidPrefab);
+        //CaveGenerator caveGen = new CaveGenerator(worldSizeX, worldSizeY, worldSizeZ, noiseScale, threshold);
+        //(voxels, voxelObjects) = caveGen.Generate(solidPrefab);
 
-        FillFirstEmptyVoxelWithWater(true);
+        //FillFirstEmptyVoxelWithWater(true);
 
-        previousVoxels = voxels.Clone() as Voxel3[,,];
+        voxels = new Voxel3[worldSizeX * worldSizeY * worldSizeZ];
+        voxelObjects = new GameObject[worldSizeX * worldSizeY * worldSizeZ];
+        voxels[GetIndex(15, 29, 15)] = CreateWaterVoxel(15, 29, 15);
+        voxels[GetIndex(15, 29, 15)].isSource = true;
+
+        previousVoxels = voxels.Clone() as Voxel3[];
     }
 
     private void FillFirstEmptyVoxelWithWater(bool isSource)
     {
-        for (int y = worldSize.y - 1; y > 0; y--)
+        for (int y = worldSizeY - 1; y > 0; y--)
         {
-            for (int x = worldSize.x - 1; x > 0; x--)
+            for (int x = worldSizeX - 1; x > 0; x--)
             {
-                for (int z = worldSize.z - 1; z > 0; z--)
+                for (int z = worldSizeZ - 1; z > 0; z--)
                 {
-                    if (!voxels[x, y, z].isSolid)
+                    if (!voxels[x + worldSizeX * (y + worldSizeY * z)].isSolid)
                     {
                         Voxel3 waterVoxel = CreateWaterVoxel(x, y - 1, z);
                         waterVoxel.isSource = isSource;
-                        voxels[x, y, z] = waterVoxel;
+                        voxels[x + worldSizeX * (y + worldSizeY * z)] = waterVoxel;
                         return;
                     }
                 }
@@ -123,40 +174,48 @@ public class World3 : MonoBehaviour
         byte fluidOut = 0;
         byte availableSpace = 0;
 
-        if (y + 1 < worldSize.y && !previousVoxels[x, y + 1, z].isSolid)
+        int voxelIndex = x + worldSizeX * (y + worldSizeY * z);
+
+        if (y + 1 < worldSizeY && !previousVoxels[x + worldSizeX * (y + 1 + worldSizeY * z)].isSolid)
         {
-            availableSpace = (byte)(maxFluidLevel - previousVoxels[x, y, z].fluidLevel);
-            fluidIn = Clamp(previousVoxels[x, y + 1, z].fluidLevel, 0, availableSpace);
+            availableSpace = (byte)(maxFluidLevel - previousVoxels[voxelIndex].fluidLevel);
+            fluidIn = Clamp(previousVoxels[x + worldSizeX * (y + 1 + worldSizeY * z)].fluidLevel, 0, availableSpace);
         }
 
-        if (y - 1 >= 0 && !previousVoxels[x, y - 1, z].isSolid)
+        if (y - 1 >= 0 && !previousVoxels[x + worldSizeX * (y - 1 + worldSizeY * z)].isSolid)
         {
-            availableSpace = (byte)(maxFluidLevel - previousVoxels[x, y - 1, z].fluidLevel);
-            fluidOut = Clamp(previousVoxels[x, y, z].fluidLevel, 0, availableSpace);
+            availableSpace = (byte)(maxFluidLevel - previousVoxels[x + worldSizeX * (y - 1 + worldSizeY * z)].fluidLevel);
+            fluidOut = Clamp(previousVoxels[voxelIndex].fluidLevel, 0, availableSpace);
         }
 
-        byte fluidLevel = (byte)(previousVoxels[x, y, z].fluidLevel + fluidIn - fluidOut);
+        byte fluidLevel = (byte)(previousVoxels[voxelIndex].fluidLevel + fluidIn - fluidOut);
         
-        if (previousVoxels[x, y, z].isSource)
+        if (previousVoxels[voxelIndex].isSource)
         {
             fluidLevel = maxFluidLevel;
         }
 
-        if (voxels[x, y, z].Equals(defaultVoxel) && fluidLevel == 0)
+        if (voxels[voxelIndex].Equals(defaultVoxel) && fluidLevel == 0)
         {
             return false;
         }
 
         UpdateVoxelFluid(x, y, z, fluidLevel);
 
-        if (voxels[x,y,z].fluidLevel == previousVoxels[x,y,z].fluidLevel)
+        if (voxels[voxelIndex].fluidLevel == previousVoxels[voxelIndex].fluidLevel)
+        {
+            voxels[voxelIndex].isSettled = true;
+            //waterVoxelsIndexes.Remove(voxelIndex);
             return false;
+        }
         return true;
     }
 
     private void FlowSideways(int x, int y, int z)
     {
-        if (previousVoxels[x, y, z].isSource)
+        int voxelIndex = x + worldSizeX * (y + worldSizeY * z);
+
+        if (previousVoxels[voxelIndex].isSource)
             return;
 
         var prevNeighbours = GetValidNeighbours(x, y, z);
@@ -168,11 +227,15 @@ public class World3 : MonoBehaviour
         var (fluidIn, fluidOut) = CalculateFluidFlow(x, y, z, prevNeighbours, neighbourCount);
     
         if (fluidIn == 0 && fluidOut == 0)
+        {
+            voxels[voxelIndex].isSettled = true;
+            //waterVoxelsIndexes.Remove(voxelIndex);
             return;
-
-        byte newFluidLevel = (byte)(previousVoxels[x, y, z].fluidLevel + fluidIn - fluidOut);
+        }
+            
+        byte newFluidLevel = (byte)(previousVoxels[voxelIndex].fluidLevel + fluidIn - fluidOut);
     
-        if (newFluidLevel == 0 && voxels[x, y, z].Equals(defaultVoxel))
+        if (newFluidLevel == 0 && voxels[voxelIndex].Equals(defaultVoxel))
             return;
 
         UpdateVoxelFluid(x, y, z, newFluidLevel);
@@ -181,19 +244,20 @@ public class World3 : MonoBehaviour
     private (Voxel3 Voxel, bool CanBeFilled)[] GetValidNeighbours(int x, int y, int z)
     {
         var neighbours = new (Voxel3 Voxel, bool CanBeFilled)[4];
-    
+
         CheckAndSetNeighbour(x + 1, y, z, 0);
         CheckAndSetNeighbour(x - 1, y, z, 1);
         CheckAndSetNeighbour(x, y, z + 1, 2);
         CheckAndSetNeighbour(x, y, z - 1, 3);
-    
+
         return neighbours;
 
         void CheckAndSetNeighbour(int nx, int ny, int nz, int index)
         {
-            if (IsValidPosition(nx, ny, nz) && !previousVoxels[nx, ny, nz].isSolid)
+            int neighbourIndex = nx + worldSizeX * (ny + worldSizeY * nz);
+            if (IsValidPosition(nx, ny, nz) && !previousVoxels[neighbourIndex].isSolid)
             {
-                neighbours[index].Voxel = previousVoxels[nx, ny, nz];
+                neighbours[index].Voxel = previousVoxels[neighbourIndex];
                 neighbours[index].Voxel.position = new Vector3(nx, ny, nz);
                 neighbours[index].CanBeFilled = true;
             }
@@ -202,9 +266,9 @@ public class World3 : MonoBehaviour
 
     private bool IsValidPosition(int x, int y, int z)
     {
-        return x >= 0 && x < worldSize.x && 
-               y >= 0 && y < worldSize.y && 
-               z >= 0 && z < worldSize.z;
+        return x >= 0 && x < worldSizeX &&
+               y >= 0 && y < worldSizeY &&
+               z >= 0 && z < worldSizeZ;
     }
 
     private int CountFlowableNeighbours((Voxel3 Voxel, bool CanBeFilled)[] neighbours)
@@ -225,7 +289,7 @@ public class World3 : MonoBehaviour
     {
         byte fluidIn = 0;
         byte fluidOut = 0;
-        Voxel3 currentVoxel = previousVoxels[x, y, z];
+        Voxel3 currentVoxel = previousVoxels[x + worldSizeX * (y + worldSizeY * z)];
 
         foreach (var nb in neighbours)
         {
@@ -252,16 +316,29 @@ public class World3 : MonoBehaviour
 
     private void UpdateVoxelFluid(int x, int y, int z, byte fluidLevel)
     {
-        if (voxels[x, y, z].Equals(defaultVoxel))
+        int voxelIndex = x + worldSizeX * (y + worldSizeY * z);
+
+        VoxelNeigbours(x, y, z, (nx, ny, nz) =>
         {
-            voxels[x, y, z] = CreateWaterVoxel(x, y, z, fluidLevel);
+            if (!IsValidPosition(nx, ny, nz)) return;
+            int neighbourIndex = x + worldSizeX * (y + worldSizeY * z);
+            if (voxels[neighbourIndex].isSettled)
+            {
+                voxels[neighbourIndex].isSettled = false;
+                //waterVoxelsIndexes.Add(neighbourIndex);
+            }
+        });
+
+        if (voxels[voxelIndex].Equals(defaultVoxel))
+        {
+            voxels[voxelIndex] = CreateWaterVoxel(x, y, z, fluidLevel);
         }
         else
         {
-            voxels[x, y, z].fluidLevel = fluidLevel;
+            voxels[voxelIndex].fluidLevel = fluidLevel;
         }
 
-        if (voxels[x, y, z].fluidLevel < minFluidLevel)
+        if (voxels[voxelIndex].fluidLevel < minFluidLevel)
         {
             DeleteVoxel(x, y, z);
         }
@@ -285,7 +362,9 @@ public class World3 : MonoBehaviour
             position = pos
         };
 
-        voxelObjects[(int)pos.x, (int)pos.y, (int)pos.z] = Instantiate(waterPrefab, pos, Quaternion.identity);
+        int voxelIndex = (int)pos.x + worldSizeX * ((int)pos.y + worldSizeY * (int)pos.z);
+        voxelObjects[voxelIndex] = Instantiate(waterPrefab, pos, Quaternion.identity);
+        waterVoxelsIndexes.Add(voxelIndex);
         return voxel;
     }
 
@@ -303,8 +382,9 @@ public class World3 : MonoBehaviour
             position = pos
         };
 
-        voxels[(int)pos.x, (int)pos.y, (int)pos.z] = solidVoxel;
-        voxelObjects[(int)pos.x, (int)pos.y, (int)pos.z] = Instantiate(solidPrefab, solidVoxel.position, Quaternion.identity);
+        int voxelIndex = (int)pos.x + worldSizeX * ((int)pos.y + worldSizeY * (int)pos.z);
+        voxels[voxelIndex] = solidVoxel;
+        voxelObjects[voxelIndex] = Instantiate(solidPrefab, solidVoxel.position, Quaternion.identity);
     }
 
     private void DeleteVoxel(int x, int y, int z)
@@ -314,13 +394,15 @@ public class World3 : MonoBehaviour
 
     private void DeleteVoxel(Vector3 pos)
     {
-        voxels[(int)pos.x, (int)pos.y, (int)pos.z] = default;
-        Destroy(voxelObjects[(int)pos.x, (int)pos.y, (int)pos.z]);
+        int voxelIndex = (int)pos.x + worldSizeX * ((int)pos.y + worldSizeY * (int)pos.z);
+        voxels[voxelIndex] = default;
+        Destroy(voxelObjects[voxelIndex]);
+        waterVoxelsIndexes.Remove(voxelIndex);
     }
 
-    private static void ReRenderVoxel(Voxel3 voxel, Vector3 pos)
+    private void ReRenderVoxel(Voxel3 voxel, Vector3 pos)
     {
-        GameObject voxelObject = voxelObjects[(int)pos.x, (int)pos.y, (int)pos.z];
+        GameObject voxelObject = voxelObjects[(int)pos.x + worldSizeX * ((int)pos.y + worldSizeY * (int)pos.z)];
 
         float scaleY = voxel.fluidLevel / (float)maxFluidLevel;
         float newY = (1f - scaleY) / 2f;
@@ -338,10 +420,11 @@ public class World3 : MonoBehaviour
         byte fluidOut = 0;
         byte availableSpace = 0;
 
-        if (y - 1 >= 0 && !previousVoxels[x, y - 1, z].isSolid)
+        int bellowVoxelIndex = x + worldSizeX * (y - 1 + worldSizeY * z);
+        if (y - 1 >= 0 && !previousVoxels[bellowVoxelIndex].isSolid)
         {
-            availableSpace = (byte)(maxFluidLevel - previousVoxels[x, y - 1, z].fluidLevel);
-            fluidOut = Clamp(previousVoxels[x, y, z].fluidLevel, 0, availableSpace);
+            availableSpace = (byte)(maxFluidLevel - previousVoxels[bellowVoxelIndex].fluidLevel);
+            fluidOut = Clamp(previousVoxels[x + worldSizeX * (y + worldSizeY * z)].fluidLevel, 0, availableSpace);
         }
 
         return fluidOut > 0;
@@ -359,5 +442,10 @@ public class World3 : MonoBehaviour
         if (value <= min) return min;
         if (value >= max) return max;
         return value;
+    }
+
+    private int GetIndex(int x, int y, int z)
+    {
+        return x + worldSizeX * (y + worldSizeY * z);
     }
 }

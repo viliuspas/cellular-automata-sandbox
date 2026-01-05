@@ -1,7 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 
-public class CaveGenerator : MonoBehaviour
+public class CaveGenerator
 {
     private Vector3Int worldSize;
     private float noiseScale;
@@ -14,7 +14,7 @@ public class CaveGenerator : MonoBehaviour
         this.threshold = threshold;
     }
 
-    public (Voxel3[,,], GameObject[,,]) Generate(GameObject wallPrefab)
+    public (Voxel3[], GameObject[]) Generate(GameObject wallPrefab)
     {
         Vector3 offset = new Vector3(
             Random.Range(0f, 10000f),
@@ -22,8 +22,8 @@ public class CaveGenerator : MonoBehaviour
             Random.Range(0f, 10000f)
         );
 
-        Voxel3[,,] voxels = new Voxel3[worldSize.x, worldSize.y, worldSize.z];
-        GameObject[,,] wallObjects = new GameObject[worldSize.x, worldSize.y, worldSize.z];
+        Voxel3[] voxels = new Voxel3[GetIndex(worldSize.x, worldSize.y, worldSize.z)];
+        GameObject[] wallObjects = new GameObject[GetIndex(worldSize.x, worldSize.y, worldSize.z)];
 
         for (int x = 0; x < worldSize.x; x++)
         {
@@ -43,17 +43,22 @@ public class CaveGenerator : MonoBehaviour
                     noise /= 3f;
                     if (noise > threshold)
                     {
-                        voxels[x, y, z] = new Voxel3
+                        voxels[GetIndex(x, y, z)] = new Voxel3
                         {
                             isSolid = true,
                             position = new Vector3(x, y, z)
                         };
-                        wallObjects[x, y, z] = GameObject.Instantiate(wallPrefab, new Vector3(x, y, z), Quaternion.identity);
+                        wallObjects[GetIndex(x, y, z)] = GameObject.Instantiate(wallPrefab, new Vector3(x, y, z), Quaternion.identity);
                     }
                 }
             }
         }
 
         return (voxels, wallObjects);
+    }
+
+    private uint GetIndex(int x, int y, int z)
+    {
+        return (uint)(x + worldSize.x * (y + worldSize.y * z));
     }
 }
