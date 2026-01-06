@@ -46,7 +46,6 @@ public class CaveGenerator
                         voxels[GetIndex(x, y, z)] = new Voxel3
                         {
                             isSolid = true,
-                            position = new Vector3(x, y, z)
                         };
                         wallObjects[GetIndex(x, y, z)] = GameObject.Instantiate(wallPrefab, new Vector3(x, y, z), Quaternion.identity);
                     }

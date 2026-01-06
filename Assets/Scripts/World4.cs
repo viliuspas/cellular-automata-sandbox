@@ -10,10 +10,10 @@ public class World4 : MonoBehaviour
     private const byte maxFluidLevel = 127;
     private const byte minFluidLevel = 1;
 
-    private Voxel3[,,] voxels;
-    private Voxel3[,,] previousVoxels;
+    private Voxel4[,,] voxels;
+    private Voxel4[,,] previousVoxels;
     private static GameObject[,,] voxelObjects;
-    private Voxel3 defaultVoxel = new Voxel3();
+    private Voxel4 defaultVoxel = new Voxel4();
 
     private Vector3Int worldSize = new Vector3Int(30, 30, 30);
     public GameObject solidPrefab;
@@ -25,7 +25,7 @@ public class World4 : MonoBehaviour
         voxelObjects = new GameObject[worldSize.x, worldSize.y, worldSize.z];
 
         InitVoxels();
-        previousVoxels = voxels.Clone() as Voxel3[,,];
+        previousVoxels = voxels.Clone() as Voxel4[,,];
     }
 
     void Update()
@@ -36,7 +36,7 @@ public class World4 : MonoBehaviour
             {
                 for (int y = 0; y < worldSize.y; y++)
                 {
-                    Voxel3 voxel = previousVoxels[x, y, z];
+                    Voxel4 voxel = previousVoxels[x, y, z];
                     if (IsVoxelEmpty(voxel)) continue;
                     if (voxel.isSolid)
                     {
@@ -48,7 +48,7 @@ public class World4 : MonoBehaviour
             }
         }
 
-        previousVoxels = voxels.Clone() as Voxel3[,,];
+        previousVoxels = voxels.Clone() as Voxel4[,,];
 
         ReRenderVoxels();
     }
@@ -70,58 +70,15 @@ public class World4 : MonoBehaviour
 
     private void InitVoxels()
     {
-        voxels = new Voxel3[worldSize.x, worldSize.y, worldSize.z];
-
-        // fill with cubes
-        for (int x = 0; x < worldSize.x; x++)
-        {
-            for (int z = 0; z < worldSize.z; z++)
-            {
-                for (int y = 0; y < worldSize.y - 1; y++)
-                {
-                    CreateSolidVoxel(x, y, z);
-                }
-            }
-        }
-
-        // first tunnel x
-        for (int x = 1; x < 4; x++)
-        {
-            DeleteVoxel(x, worldSize.y - 2, worldSize.z - 2);
-        }
-
-        //// go down
-        //for (int y = worldSize.y - 2; y > 1; y--)
-        //{
-        //    DeleteVoxel(worldSize.x - 2, y, worldSize.z - 2);
-        //}
-
-        // first tunnel z
-        for (int z = worldSize.z - 2; z > worldSize.z - 8; z--)
-        {
-            DeleteVoxel(4, worldSize.y - 2, z);
-        }
-
-        DeleteVoxel(4, 27, 23);
-
-        for (int x = 1; x < worldSize.x - 1; x++)
-        {
-            for (int z = 1; z < worldSize.z - 1; z++)
-            {
-                for (int y = worldSize.y - 4; y > worldSize.y - 20; y--)
-                {
-                    DeleteVoxel(x, y, z);
-                }
-            }
-        }
+        voxels = new Voxel4[worldSize.x, worldSize.y, worldSize.z];
 
         // water
-        Vector3Int waterPos = new Vector3Int(1, worldSize.y - 2, worldSize.z - 2);
+        Vector3Int waterPos = new Vector3Int(15, 29, 15);
         voxels[waterPos.x, waterPos.y, waterPos.z] = CreateWaterVoxel(waterPos);
         voxels[waterPos.x, waterPos.y, waterPos.z].isSource = true;
     }
 
-    private void Water_CheckBellow(Voxel3 voxel, int x, int y, int z)
+    private void Water_CheckBellow(Voxel4 voxel, int x, int y, int z)
     {
         Vector3Int newPos = new Vector3Int(x, y - 1, z);
         if (newPos.y >= 0 && CanVoxelBeFilledBellow(previousVoxels[newPos.x, newPos.y, newPos.z]))
@@ -140,13 +97,11 @@ public class World4 : MonoBehaviour
                     return;
                 }
 
-                Debug.Log($"down {x} {y} {z} to {newPos.x} {newPos.y} {newPos.z}; {previousVoxels[x, y, z].fluidLevel}; {previousVoxels[newPos.x, newPos.y, newPos.z].fluidLevel}; to transfer {fluidToTransfer}");
-
                 voxels[x, y, z].fluidLevel -= fluidToTransfer;
                 if (voxels[x, y, z].fluidLevel < minFluidLevel)
                 {
                     Destroy(voxelObjects[x, y, z]);
-                    voxels[x, y, z] = new Voxel3();
+                    voxels[x, y, z] = new Voxel4();
                 }
                 else
                 {
@@ -170,11 +125,11 @@ public class World4 : MonoBehaviour
 
     private void Water_CheckSides(int x, int y, int z)
     {
-        Voxel3 prevVoxel = previousVoxels[x, y, z];
+        Voxel4 prevVoxel = previousVoxels[x, y, z];
 
         if (prevVoxel.fluidLevel <= minFluidLevel) return;
 
-        (Voxel3 Voxel, bool CanBeFilled)[] prevNeighbours = new (Voxel3, bool)[4];
+        (Voxel4 Voxel, bool CanBeFilled)[] prevNeighbours = new (Voxel4, bool)[4];
 
         if (x + 1 < worldSize.x && CanVoxelBeFilledToSides(prevVoxel, previousVoxels[x + 1, y, z]))
         {
@@ -216,7 +171,7 @@ public class World4 : MonoBehaviour
 
         foreach (var nb in prevNeighbours)
         {
-            Voxel3 currentVoxel = voxels[x, y, z];
+            Voxel4 currentVoxel = voxels[x, y, z];
 
             if (!nb.CanBeFilled ||
                 currentVoxel.fluidLevel <= minFluidLevel)
@@ -225,14 +180,12 @@ public class World4 : MonoBehaviour
             }
 
             Vector3 nbPos = nb.Voxel.position;
-            Voxel3 neighbour = voxels[(int)nbPos.x, (int)nbPos.y, (int)nbPos.z];
+            Voxel4 neighbour = voxels[(int)nbPos.x, (int)nbPos.y, (int)nbPos.z];
 
             byte currentFluidToTransfer = CalculateFluidToTransfer(currentVoxel, neighbour, maxFluidLevelToTransfer);
 
             if (currentFluidToTransfer == 0)
                 continue;
-
-            Debug.Log($"sides {x} {y} {z} to {nbPos.x} {nbPos.y} {nbPos.z}; {voxels[x, y, z].fluidLevel}; {voxels[(int)nbPos.x, (int)nbPos.y, (int)nbPos.z].fluidLevel}; to transfer {currentFluidToTransfer}");
 
             if (voxelObjects[(int)nbPos.x, (int)nbPos.y, (int)nbPos.z] == null)
             {
@@ -251,7 +204,7 @@ public class World4 : MonoBehaviour
             if (voxels[x, y, z].fluidLevel < minFluidLevel)
             {
                 Destroy(voxelObjects[x, y, z]);
-                voxels[x, y, z] = new Voxel3();
+                voxels[x, y, z] = new Voxel4();
                 return;
             }
         }
@@ -264,17 +217,17 @@ public class World4 : MonoBehaviour
                z >= 0 && z < worldSize.z;
     }
 
-    private Voxel3 CreateWaterVoxel(int x, int y, int z, byte? fluidLevel = null)
+    private Voxel4 CreateWaterVoxel(int x, int y, int z, byte? fluidLevel = null)
     {
         return CreateWaterVoxel(new Vector3Int(x, y, z), fluidLevel);
     }
 
-    private Voxel3 CreateWaterVoxel(Vector3 pos, byte? fluidLevel = null)
+    private Voxel4 CreateWaterVoxel(Vector3 pos, byte? fluidLevel = null)
     {
         if (fluidLevel == null)
             fluidLevel = maxFluidLevel;
 
-        Voxel3 voxel = new Voxel3
+        Voxel4 voxel = new Voxel4
         {
             isSolid = false,
             fluidLevel = (byte)fluidLevel,
@@ -293,7 +246,7 @@ public class World4 : MonoBehaviour
 
     private void CreateSolidVoxel(Vector3 pos)
     {
-        Voxel3 solidVoxel = new Voxel3
+        Voxel4 solidVoxel = new Voxel4
         {
             isSolid = true,
             fluidLevel = 0,
@@ -315,7 +268,7 @@ public class World4 : MonoBehaviour
         Destroy(voxelObjects[(int)pos.x, (int)pos.y, (int)pos.z]);
     }
 
-    private static void ReRenderVoxel(Voxel3 voxel, Vector3 pos)
+    private static void ReRenderVoxel(Voxel4 voxel, Vector3 pos)
     {
         GameObject voxelObject = voxelObjects[(int)pos.x, (int)pos.y, (int)pos.z];
 
@@ -326,24 +279,24 @@ public class World4 : MonoBehaviour
         voxelObject.transform.position = new Vector3(pos.x, (float)Math.Ceiling(pos.y) - newY, pos.z);
     }
 
-    private static bool CanVoxelBeFilledToSides(Voxel3 voxel, Voxel3 newVoxel)
+    private static bool CanVoxelBeFilledToSides(Voxel4 voxel, Voxel4 newVoxel)
     {
         return IsVoxelEmpty(newVoxel) ||
             (!newVoxel.isSolid && newVoxel.fluidLevel < maxFluidLevel && voxel.fluidLevel > newVoxel.fluidLevel);
     }
 
-    private static bool CanVoxelBeFilledBellow(Voxel3 newVoxel)
+    private static bool CanVoxelBeFilledBellow(Voxel4 newVoxel)
     {
         return IsVoxelEmpty(newVoxel) ||
             (!newVoxel.isSolid && newVoxel.fluidLevel < maxFluidLevel);
     }
 
-    private static bool IsVoxelEmpty(Voxel3 voxel)
+    private static bool IsVoxelEmpty(Voxel4 voxel)
     {
         return voxel.fluidLevel == 0 && !voxel.isSolid;
     }
 
-    private byte CalculateFluidToTransfer(Voxel3 voxel, Voxel3 neighbour, byte maxFluidToTransfer)
+    private byte CalculateFluidToTransfer(Voxel4 voxel, Voxel4 neighbour, byte maxFluidToTransfer)
     {
         if (maxFluidToTransfer > (voxel.fluidLevel - neighbour.fluidLevel) / 2)
         {
