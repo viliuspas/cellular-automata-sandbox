@@ -6,7 +6,6 @@ public struct Voxel
     public bool isSource;
     public byte fluidLevel;
     public bool isSettled;
-    public bool isFalling;
 
     public bool Equals(Voxel other)
     {
