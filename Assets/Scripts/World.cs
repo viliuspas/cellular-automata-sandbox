@@ -151,10 +151,6 @@ public class World : MonoBehaviour
 
     private void InitVoxels()
     {
-        //CaveGenerator caveGen = new CaveGenerator(worldSizeX, worldSizeY, worldSizeZ, noiseScale, threshold);
-        //(Voxels, VoxelObjects) = caveGen.Generate(solidPrefab);
-
-        //FillFirstEmptyVoxelWithWater(true);
 
         Voxels = new Voxel[worldSizeX * worldSizeY * worldSizeZ];
         VoxelObjects = new GameObject[worldSizeX * worldSizeY * worldSizeZ];
