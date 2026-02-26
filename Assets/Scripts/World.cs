@@ -61,30 +61,11 @@ public class World : MonoBehaviour
                 if (Voxels[voxelIndex].isSettled)
                     continue;
 
-                //(int x, int y, int z) = GetVoxelCoordinates(VoxelIndex);
                 GetVoxelCoordinates(voxelIndex, out int x, out int y, out int z);
 
                 HandleVoxelStep(x, y, z);
                 HandleVoxelNeigbours(x, y, z, HandleVoxelStep);
             }
-
-            //for (int x = 0; x < worldSizeX; x++)
-            //{
-            //    for (int z = 0; z < worldSizeZ; z++)
-            //    {
-            //        for (int y = 0; y < worldSizeY; y++)
-            //        {
-            //            int VoxelIndex = GetIndex(x, y, z);
-            //            if (Voxels[VoxelIndex].isSolid) continue;
-            //            if (Voxels[VoxelIndex].isSettled)
-            //                continue;
-            //            //GetVoxelCoordinates(VoxelIndex, out int xx, out int yy, out int zz);
-
-            //            HandleVoxelStep(x, y, z);
-            //            //HandleVoxelNeigbours(x, y, z, HandleVoxelStep);
-            //        }
-            //    }
-            //}
 
             previousVoxels = Voxels.Clone() as Voxel[];
         }
@@ -128,25 +109,12 @@ public class World : MonoBehaviour
 
     private void ReRenderVoxels()
     {
-        for (int x = 0; x < worldSizeX; x++)
+        foreach (int VoxelIndex in waterVoxelsIndexes)
         {
-            for (int z = 0; z < worldSizeZ; z++)
-            {
-                for (int y = 0; y < worldSizeY; y++)
-                {
-                    int VoxelIndex = GetIndex(x, y, z);
-                    if (Voxels[VoxelIndex].isSettled) continue;
-                    if (VoxelObjects[VoxelIndex] == null || Voxels[VoxelIndex].isSolid) continue;
-                    ReRenderVoxel(VoxelIndex);
-                }
-            }
+            if (Voxels[VoxelIndex].isSettled) continue;
+            if (VoxelObjects[VoxelIndex] == null || Voxels[VoxelIndex].isSolid) continue;
+            ReRenderVoxel(VoxelIndex);
         }
-        //foreach (int VoxelIndex in waterVoxelsIndexes)
-        //{
-        //    if (Voxels[VoxelIndex].isSettled) continue;
-        //    if (VoxelObjects[VoxelIndex] == null || Voxels[VoxelIndex].isSolid) continue;
-        //    ReRenderVoxel(VoxelIndex);
-        //}
     }
 
     private void InitVoxels()
@@ -159,26 +127,6 @@ public class World : MonoBehaviour
         Voxels[VoxelIndex].isSource = true;
 
         previousVoxels = Voxels.Clone() as Voxel[];
-    }
-
-    private void FillFirstEmptyVoxelWithWater(bool isSource)
-    {
-        for (int y = worldSizeY - 1; y > 0; y--)
-        {
-            for (int x = worldSizeX - 1; x > 0; x--)
-            {
-                for (int z = worldSizeZ - 1; z > 0; z--)
-                {
-                    if (!Voxels[x + worldSizeX * (y + worldSizeY * z)].isSolid)
-                    {
-                        Voxel waterVoxel = CreateWaterVoxel(x, y - 1, z);
-                        waterVoxel.isSource = isSource;
-                        Voxels[x + worldSizeX * (y + worldSizeY * z)] = waterVoxel;
-                        return;
-                    }
-                }
-            }
-        }
     }
 
     private bool FlowDown(int x, int y, int z)
@@ -232,15 +180,12 @@ public class World : MonoBehaviour
         if (previousVoxels[VoxelIndex].isSource)
             return;
 
-        //var prevNeighbours = GetValidNeighbours(x, y, z);
-        //int neighbourCount = CountFlowableNeighbours(prevNeighbours);
         int[] prevNeighbours = new int[4];
         int neighbourCount = GetValidNeighbours(x, y, z, prevNeighbours);
 
         if (neighbourCount == 0)
             return;
 
-        //var (fluidIn, fluidOut) = CalculateFluidFlow(x, y, z, prevNeighbours, neighbourCount);
 
         CalculateFluidFlow(x, y, z, prevNeighbours, neighbourCount, out byte fluidIn, out byte fluidOut);
 
@@ -257,30 +202,6 @@ public class World : MonoBehaviour
 
         UpdateVoxelFluid(x, y, z, newFluidLevel);
     }
-
-    //private (Voxel Voxel, int VoxelIndex, bool CanBeFilled)[] GetValidNeighbours(int x, int y, int z)
-    //{
-    //    var neighbours = new (Voxel Voxel, int VoxelIndex, bool CanBeFilled)[4];
-
-    //    CheckAndSetNeighbour(x + 1, y, z, 0);
-    //    CheckAndSetNeighbour(x - 1, y, z, 1);
-    //    CheckAndSetNeighbour(x, y, z + 1, 2);
-    //    CheckAndSetNeighbour(x, y, z - 1, 3);
-
-    //    return neighbours;
-
-    //    void CheckAndSetNeighbour(int nx, int ny, int nz, int index)
-    //    {
-    //        int neighbourIndex = GetIndex(nx, ny, nz);
-    //        if (IsValidPosition(nx, ny, nz) && !previousVoxels[neighbourIndex].isSolid)
-    //        {
-    //            ref var neighbour = ref neighbours[index];
-    //            neighbour.Voxel = previousVoxels[neighbourIndex];
-    //            neighbour.VoxelIndex = neighbourIndex;
-    //            neighbour.CanBeFilled = true;
-    //        }
-    //    }
-    //}
 
     private int GetValidNeighbours(int x, int y, int z, int[] neighbourIndices)
     {
@@ -311,62 +232,6 @@ public class World : MonoBehaviour
                y >= 0 && y < worldSizeY &&
                z >= 0 && z < worldSizeZ;
     }
-
-    //private int CountFlowableNeighbours((Voxel Voxel, int VoxelIndex, bool CanBeFilled)[] neighbours)
-    //{
-    //    int count = 0;
-    //    foreach (var nb in neighbours)
-    //    {
-    //        if (nb.CanBeFilled && !CanVoxelFlowDown(nb.VoxelIndex))
-    //            count++;
-    //    }
-    //    return count;
-    //}
-
-    private int CountFlowableNeighbours(int[] neighbours)
-    {
-        int count = 0;
-        foreach (var nbIdx in neighbours)
-        {
-            if (nbIdx != 0 && !CanVoxelFlowDown(nbIdx))
-                count++;
-        }
-        return count;
-    }
-
-    //private (byte, byte) CalculateFluidFlow(
-    //    int x, int y, int z,
-    //    (Voxel Voxel, int neighbourIndex, bool CanBeFilled)[] neighbours,
-    //    int neighbourCount)
-    //    //out byte fluidIn, out byte fluidOut)
-    //{
-    //    byte fluidIn = 0;
-    //    byte fluidOut = 0;
-    //    int VoxelIndex = GetIndex(x, y, z);
-    //    Voxel currentVoxel = previousVoxels[VoxelIndex];
-
-    //    foreach (var nb in neighbours)
-    //    {
-    //        if (!nb.CanBeFilled || CanVoxelFlowDown(nb.neighbourIndex))
-    //            continue;
-
-    //        if (currentVoxel.fluidLevel == 0 && nb.Voxel.fluidLevel == 0)
-    //            continue;
-
-    //        if (nb.Voxel.fluidLevel > currentVoxel.fluidLevel)
-    //        {
-    //            if (nb.Voxel.fluidLevel - currentVoxel.fluidLevel == 1)
-    //                fluidIn = 1;
-    //            else
-    //                fluidIn += Diff(nb.Voxel.fluidLevel, currentVoxel.fluidLevel, neighbourCount);
-    //        }
-
-    //        if (nb.Voxel.fluidLevel < currentVoxel.fluidLevel)
-    //            fluidOut += Diff(currentVoxel.fluidLevel, nb.Voxel.fluidLevel, neighbourCount);
-    //    }
-
-    //    return (fluidIn, fluidOut);
-    //}
 
     private void CalculateFluidFlow(
     int x, int y, int z,
@@ -516,7 +381,6 @@ public class World : MonoBehaviour
         return x + worldSizeX * (y + worldSizeY * z);
     }
 
-    //private (int x, int y, int z) GetVoxelCoordinates(int VoxelIndex)
     void GetVoxelCoordinates(int index, out int x, out int y, out int z)
     {
         x = index % worldSizeX;
