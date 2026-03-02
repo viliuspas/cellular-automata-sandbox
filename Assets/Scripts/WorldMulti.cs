@@ -13,6 +13,7 @@ public class WorldMulti : MonoBehaviour
     public Vector3Int worldSize = new Vector3Int(20, 20, 20);
     public GameObject solidPrefab;
     public GameObject waterPrefab;
+    public bool showFluidLevel = false;
 
     private const byte maxFluidLevel = 127;
     private const byte minFluidLevel = 1;
@@ -102,15 +103,16 @@ public class WorldMulti : MonoBehaviour
                 if (voxelObjects[i] == null)
                 {
                     SpawnWaterVoxel(x, y, z);
-                    HandleVoxelNeigbours(x,y,z, MarkAsDirtyIfValid);
                 }
 
                 ReRenderVoxel(i);
+                HandleVoxelNeigbours(x, y, z, MarkAsDirtyIfValid);
             }
         }
     }
 
-    [BurstCompile(Debug=true)]
+    //[BurstCompile(Debug=true)]
+    [BurstCompile]
     private struct FluidSimulationJob : IJobParallelFor
     {
         [ReadOnly] public NativeArray<Voxel> readVoxels;
@@ -125,17 +127,15 @@ public class WorldMulti : MonoBehaviour
         {
             Voxel cur = readVoxels[index];
 
-            if (!dirty[index]) return;
             if (cur.isSolid) return;
-            if (cur.isSettled && !cur.isSource) return;
+            if (!dirty[index]) return;
 
             IndexToXYZ(index, out int x, out int y, out int z);
-            Debug.Log($"index: {index}, Processing voxel at ({x}, {y}, {z}) with fluid level {cur.fluidLevel} and isSource={cur.isSource}");
+            //Debug.Log($"index: {index}, Processing voxel at ({x}, {y}, {z}) with fluid level {cur.fluidLevel} and isSource={cur.isSource}");
 
             if (cur.isSource)
             {
                 cur.fluidLevel = maxFluid;
-                cur.isSettled = false;
             }
 
             bool flowedDown = TryFlowDown(ref cur, x, y, z);
@@ -169,16 +169,16 @@ public class WorldMulti : MonoBehaviour
                 fluidOut = Clamp(cur.fluidLevel, 0, availableSpace);
             }
 
+            if (fluidOut == 0 && fluidIn == 0)
+            {
+                return false;
+            }
+
             byte fluidLevel = (byte)(cur.fluidLevel + fluidIn - fluidOut);
 
             if (cur.isSource)
             {
                 fluidLevel = maxFluidLevel;
-            }
-
-            if (fluidOut == 0)
-            {
-                return false;
             }
 
             if (cur.Equals(new Voxel()) && fluidLevel == 0)
@@ -188,11 +188,11 @@ public class WorldMulti : MonoBehaviour
 
             if (fluidLevel == cur.fluidLevel)
             {
-                cur.isSettled = true;
                 return cur.isSource;
             }
 
             cur.fluidLevel = fluidLevel;
+
             return true;
         }
 
@@ -211,7 +211,6 @@ public class WorldMulti : MonoBehaviour
 
             if (fluidIn == 0 && fluidOut == 0 && cur.fluidLevel != 0)
             {
-                cur.isSettled = true;
                 return false;
             }
 
@@ -249,10 +248,10 @@ public class WorldMulti : MonoBehaviour
         }
 
         private void CalculateFluidFlow(
-        int x, int y, int z,
-        NeighboursXZ neighbours,
-        int neighbourCount,
-        out byte fluidIn, out byte fluidOut)
+            int x, int y, int z,
+            NeighboursXZ neighbours,
+            int neighbourCount,
+            out byte fluidIn, out byte fluidOut)
         {
             fluidIn = 0;
             fluidOut = 0;
@@ -362,7 +361,7 @@ public class WorldMulti : MonoBehaviour
     {
         foreach (int voxelIndex in waterVoxelsIndexes)
         {
-            if (writeVoxels[voxelIndex].isSettled) continue;
+            //if (writeVoxels[voxelIndex].isSettled) continue; // change to dirty check
             if (voxelObjects[voxelIndex] == null || writeVoxels[voxelIndex].isSolid) continue;
             ReRenderVoxel(voxelIndex);
         }
@@ -375,16 +374,18 @@ public class WorldMulti : MonoBehaviour
         dirty = new NativeArray<bool>(totalVoxels, Allocator.Persistent);
         voxelObjects = new GameObject[totalVoxels];
 
-        //int voxelIndex = GetIndex(worldSizeX / 2, worldSizeY - 1, worldSizeZ / 2);
-        int voxelIndex = XYZToIndex(worldSizeX / 2, 0, worldSizeZ / 2);
+        Vector3Int startVoxelPos = new Vector3Int(worldSizeX / 2, worldSizeY - 1, worldSizeZ / 2);
+        //Vector3Int startVoxelPos = new Vector3Int(worldSizeX / 2, 0, worldSizeZ / 2);
+
+        int voxelIndex = XYZToIndex(startVoxelPos.x, startVoxelPos.y, startVoxelPos.z);
 
         Voxel voxel = new Voxel { fluidLevel = maxFluidLevel, isSource = true };
 
         readVoxels[voxelIndex] = voxel;
         dirty[voxelIndex] = true;
-        HandleVoxelNeigbours(worldSizeX / 2, worldSizeY - 1, worldSizeZ / 2, MarkAsDirtyIfValid);
+        HandleVoxelNeigbours(startVoxelPos.x, startVoxelPos.y, startVoxelPos.z, MarkAsDirtyIfValid);
 
-        SpawnWaterVoxel(worldSizeX / 2, worldSizeY - 1, worldSizeZ / 2);
+        SpawnWaterVoxel(startVoxelPos.x, startVoxelPos.y, startVoxelPos.z);
     }
 
     private void SpawnWaterVoxel(int x, int y, int z)
@@ -398,14 +399,16 @@ public class WorldMulti : MonoBehaviour
 
     private void UpdateFluidLevelText(int voxelIndex, byte fluidLevel)
     {
+        if (!showFluidLevel) return;
+
         string value = fluidLevel.ToString();
         float offset = -0.5f;
 
         Vector3[] directions = {
-        Vector3.forward, Vector3.back,
-        Vector3.left, Vector3.right,
-        Vector3.up, Vector3.down
-    };
+            Vector3.forward, Vector3.back,
+            Vector3.left, Vector3.right,
+            Vector3.up, Vector3.down
+        };
 
         Transform parent = voxelObjects[voxelIndex].transform;
 
