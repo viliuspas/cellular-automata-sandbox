@@ -6,6 +6,7 @@ using Unity.Collections;
 using Unity.Jobs;
 using Unity.Profiling;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 public class WorldMulti : MonoBehaviour
 {
@@ -390,7 +391,52 @@ public class WorldMulti : MonoBehaviour
     {
         int voxelIndex = XYZToIndex(x, y, z);
         voxelObjects[voxelIndex] = Instantiate(waterPrefab, new Vector3(x, y, z), Quaternion.identity);
+        UpdateFluidLevelText(voxelIndex, maxFluidLevel);
+
         waterVoxelsIndexes.Add(voxelIndex);
+    }
+
+    private void UpdateFluidLevelText(int voxelIndex, byte fluidLevel)
+    {
+        string value = fluidLevel.ToString();
+        float offset = -0.5f;
+
+        Vector3[] directions = {
+        Vector3.forward, Vector3.back,
+        Vector3.left, Vector3.right,
+        Vector3.up, Vector3.down
+    };
+
+        Transform parent = voxelObjects[voxelIndex].transform;
+
+        int existingCount = 0;
+        foreach (Transform child in parent)
+        {
+            if (child.name.Contains("FluidLevelText"))
+            {
+                var tmp = child.GetComponent<TMPro.TextMeshPro>();
+                if (tmp != null)
+                    tmp.text = value;
+
+                existingCount++;
+            }
+        }
+
+        if (existingCount == 6)
+            return;
+
+        foreach (var dir in directions)
+        {
+            GameObject textObj = new GameObject("FluidLevelText");
+            textObj.transform.SetParent(parent);
+            textObj.transform.localPosition = dir * offset;
+            textObj.transform.localRotation = Quaternion.LookRotation(dir);
+
+            var tmp = textObj.AddComponent<TMPro.TextMeshPro>();
+            tmp.text = value;
+            tmp.alignment = TMPro.TextAlignmentOptions.Center;
+            tmp.fontSize = 2;
+        }
     }
 
     private void CreateSolidVoxel(int x, int y, int z)
@@ -416,13 +462,17 @@ public class WorldMulti : MonoBehaviour
     private void ReRenderVoxel(int voxelIndex)
     {
         IndexToXYZ(voxelIndex, out int x, out int y, out int z);
-        GameObject VoxelObject = voxelObjects[voxelIndex];
+        GameObject voxelObject = voxelObjects[voxelIndex];
 
-        float scaleY = readVoxels[voxelIndex].fluidLevel / (float)maxFluidLevel;
+        byte fluidLevel = readVoxels[voxelIndex].fluidLevel;
+
+        float scaleY = fluidLevel / (float)maxFluidLevel;
         float newY = (1f - scaleY) / 2f;
 
-        VoxelObject.transform.localScale = new Vector3(1f, scaleY, 1f);
-        VoxelObject.transform.position = new Vector3(x, y - newY, z);
+        voxelObject.transform.localScale = new Vector3(1f, scaleY, 1f);
+        voxelObject.transform.position = new Vector3(x, y - newY, z);
+
+        UpdateFluidLevelText(voxelIndex, fluidLevel);
     }
 
     private static bool IsValidPosition(int x, int y, int z)
